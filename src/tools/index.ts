@@ -6,6 +6,7 @@ export { registerQueryTool } from './queries.js';
 // 命令处理器导出
 export { registerAssetsHandlers } from './commands/assets.js';
 export { registerAttrHandlers } from './commands/attr.js';
+export { registerAvHandlers, registerAvTools } from './commands/av.js';
 export { registerBlockHandlers } from './commands/block.js';
 export { registerConvertHandlers } from './commands/convert.js';
 export { registerExportHandlers } from './commands/export.js';

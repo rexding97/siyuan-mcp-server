@@ -1,19 +1,41 @@
 import { z } from 'zod';
-import { createHandler } from '../../utils/client.js';
+import { client, createHandler } from '../../utils/client.js';
 import { registry } from '../../utils/registry.js';
 import { CommandHandler } from '../../utils/registry.js';
 
 const namespace = 'file';
 
+const getFileParams = z.object({
+    path: z.string().describe('File path')
+});
+type GetFileParams = z.infer<typeof getFileParams>;
+
+const putFileParams = z.object({
+    path: z.string().describe('File path'),
+    file: z.string().describe('File content (string)'),
+    isDir: z.boolean().optional().describe('Whether it is a directory')
+});
+type PutFileParams = z.infer<typeof putFileParams>;
+
 // Get file
-const getFileHandler: CommandHandler = {
+const getFileHandler: CommandHandler<GetFileParams> = {
     namespace,
     name: 'getFile',
     description: 'Get file content',
-    params: z.object({
-        path: z.string().describe('File path')
-    }),
-    handler: createHandler('/api/file/getFile'),
+    params: getFileParams,
+    handler: async (params) => {
+        const result = await client.post('/api/file/getFile', { path: params.path });
+        // getFile returns raw file content on success, or { code, msg, data } on error
+        if (result && typeof result === 'object' && 'code' in result && typeof (result as any).code === 'number' && (result as any).code !== 0) {
+            return {
+                content: [{ type: 'text', text: `Error: ${(result as any).msg}` }],
+                isError: true
+            };
+        }
+        return {
+            content: [{ type: 'text', text: JSON.stringify(result) }]
+        };
+    },
     documentation: {
         description: 'Get file content',
         params: {
@@ -48,16 +70,22 @@ const getFileHandler: CommandHandler = {
 };
 
 // Put file
-const putFileHandler: CommandHandler = {
+const putFileHandler: CommandHandler<PutFileParams> = {
     namespace,
     name: 'putFile',
     description: 'Put file content',
-    params: z.object({
-        path: z.string().describe('File path'),
-        file: z.any().describe('File content'),
-        isDir: z.boolean().optional().describe('Whether it is a directory')
-    }),
-    handler: createHandler('/api/file/putFile'),
+    params: putFileParams,
+    handler: async (params) => {
+        const result = await client.putFile(params.path, params.file, params.isDir ?? false);
+        return {
+            content: [
+                {
+                    type: 'text',
+                    text: JSON.stringify(result)
+                }
+            ]
+        };
+    },
     documentation: {
         description: 'Put file content',
         params: {
@@ -67,8 +95,8 @@ const putFileHandler: CommandHandler = {
                 required: true
             },
             file: {
-                type: 'any',
-                description: 'File content',
+                type: 'string',
+                description: 'File content (string)',
                 required: true
             },
             isDir: {

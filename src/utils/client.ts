@@ -6,6 +6,28 @@ export interface SiYuanResponse<T = any> {
     data: T;
 }
 
+export function resolveSiyuanToken(env: Record<string, string | undefined> = process.env): string {
+    return env.SIYUAN_TOKEN ||
+        env.SIYUAN_API_TOKEN ||
+        env.SIYUAN_AUTH_TOKEN ||
+        '';
+}
+
+export function normalizeSiyuanApiUrl(rawUrl: string | undefined): string {
+    const fallback = 'http://localhost:6806';
+    const value = rawUrl?.trim();
+
+    if (!value) {
+        return fallback;
+    }
+
+    if (!/^https?:\/\//i.test(value)) {
+        return `http://${value}`;
+    }
+
+    return value;
+}
+
 // 创建标准 handler 的工厂函数
 export function createHandler(endpoint: string): (params: unknown) => Promise<any> {
     return async (params: unknown) => {
@@ -32,9 +54,10 @@ class SiYuanClient {
 
         if (!token) {
             console.warn('⚠️  警告：未设置 SIYUAN_TOKEN 环境变量，API 调用可能会失败');
-            console.log('💡 请设置以下环境变量之一：SIYUAN_TOKEN、SIYUAN_API_TOKEN、SIYUAN_AUTH_TOKEN');
-        } else {
-            console.log('🔗 已连接到思源笔记 API:', baseURL);
+            console.warn('💡 请设置以下环境变量之一：SIYUAN_TOKEN、SIYUAN_API_TOKEN、SIYUAN_AUTH_TOKEN');
+        } else if (process.env.NODE_ENV !== 'test') {
+            // MCP 使用 stdio 传输时，stdout 只能输出 JSON-RPC 消息。
+            console.error('🔗 已连接到思源笔记 API:', baseURL);
         }
 
         this.axiosInstance = axios.create({
@@ -85,15 +108,11 @@ class SiYuanClient {
     }
 
     private getBaseURL(): string {
-        return process.env.SIYUAN_API_URL || "http://localhost:6806";
+        return normalizeSiyuanApiUrl(process.env.SIYUAN_API_URL);
     }
 
     private getToken(): string {
-        // 尝试从多个源获取 token
-        return process.env.SIYUAN_TOKEN ||
-            process.env.SIYUAN_API_TOKEN ||
-            process.env.SIYUAN_AUTH_TOKEN ||
-            "";
+        return resolveSiyuanToken(process.env);
     }
 
     public static getInstance(): SiYuanClient {
@@ -106,6 +125,24 @@ class SiYuanClient {
     // 基础 HTTP 方法
     async post<T = any>(url: string, data?: any): Promise<SiYuanResponse<T>> {
         return this.axiosInstance.post(url, data);
+    }
+
+    /**
+     * Upload file via multipart/form-data
+     * SiYuan's /api/file/putFile requires multipart/form-data, not JSON
+     */
+    async putFile(path: string, content: string, isDir = false): Promise<SiYuanResponse<any>> {
+        const formData = new FormData();
+        formData.append('path', path);
+        formData.append('isDir', String(isDir));
+        if (!isDir) {
+            formData.append('file', new Blob([content]), path.split('/').pop() || 'file');
+        }
+        return this.axiosInstance.post('/api/file/putFile', formData, {
+            headers: {
+                'Content-Type': undefined as any
+            }
+        });
     }
 }
 

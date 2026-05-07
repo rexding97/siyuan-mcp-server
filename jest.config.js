@@ -14,6 +14,5 @@ export default {
     }]
   },
   extensionsToTreatAsEsm: ['.ts'],
-  testMatch: ['**/__tests__/**/*.test.ts'],
-  setupFiles: ['./jest.setup.js']
+  testMatch: ['**/__tests__/**/*.test.ts']
 }; 
