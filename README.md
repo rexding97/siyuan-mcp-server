@@ -1,5 +1,7 @@
 # SiYuan MCP Server
 
+English | [简体中文](README.zh-CN.md)
+
 Model Context Protocol (MCP) server for [SiYuan Note](https://b3log.org/siyuan/).
 
 Enable AI assistants to create, read, update, and manage your SiYuan notes directly.
