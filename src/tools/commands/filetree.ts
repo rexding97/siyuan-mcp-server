@@ -289,8 +289,61 @@ const getHPathByIDHandler: CommandHandler = {
     }
 };
 
+// List documents by path
+const listDocsByPathHandler: CommandHandler = {
+    namespace,
+    name: 'listDocsByPath',
+    description: 'List documents in a notebook by path',
+    params: z.object({
+        notebook: z.string().describe('Notebook ID'),
+        path: z.string().optional().describe('Document path, default is root "/"')
+    }),
+    handler: createHandler('/api/filetree/listDocsByPath'),
+    documentation: {
+        description: 'List documents in a notebook by path',
+        params: {
+            notebook: {
+                type: 'string',
+                description: 'Notebook ID',
+                required: true
+            },
+            path: {
+                type: 'string',
+                description: 'Document path, default is root "/"',
+                required: false
+            }
+        },
+        returns: {
+            type: 'object',
+            description: 'Document list',
+            properties: {
+                files: 'Array of documents'
+            }
+        },
+        examples: [
+            {
+                description: 'This example retrieves the list of documents at the root of a specified notebook.',
+                params: {
+                    notebook: "20210817205410-2kvfpfn",
+                    path: "/"
+                },
+                response: {
+                    files: [
+                        {
+                            id: "20200812220555-lj3enxa",
+                            name: "Document name"
+                        }
+                    ]
+                }
+            }
+        ],
+        apiLink: 'https://github.com/siyuan-note/siyuan/blob/master/API.md#list-documents'
+    }
+};
+
 // Register all filetree related commands
 export function registerFiletreeHandlers() {
+    registry.registerCommand(listDocsByPathHandler);
     registry.registerCommand(createDocWithMdHandler);
     registry.registerCommand(renameDocHandler);
     registry.registerCommand(removeDocHandler);
