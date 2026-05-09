@@ -19,8 +19,8 @@ const columnTypeEnum = z.enum([
 
 /**
  * Check if renderAttributeView returned usable structured data.
- * SiYuan's renderAttributeView often returns a shell with only default columns
- * (e.g. '主键', '单选') and zero rows. We treat that as unusable and fallback to SQL.
+ * A valid response must have actual column definitions (more than just the
+ * two default system columns '主键' and '单选') or real row/keyValue data.
  */
 export function hasUsableAvData(data: any): boolean {
     if (!data) return false;
@@ -28,10 +28,12 @@ export function hasUsableAvData(data: any): boolean {
     const rows = view?.rows;
     const keyValues = data.keyValues || data.av?.keyValues;
 
+    // Has actual column definitions (more than default 2 columns)
+    if (Array.isArray(view?.columns) && view.columns.length > 2) return true;
+    // Has keyValues with real column definitions (more than default 2)
+    if (Array.isArray(keyValues) && keyValues.length > 2) return true;
     // Has actual row data
     if (Array.isArray(rows) && rows.length > 0) return true;
-    // Has keyValues
-    if (Array.isArray(keyValues) && keyValues.length > 0) return true;
 
     return false;
 }
@@ -59,16 +61,73 @@ async function fetchAvContentViaSql(avID: string): Promise<{ content: string; ty
 }
 
 /**
- * Get column info from an Attribute View
- * Returns a Map: columnName -> { keyID, type, name }
+ * If the given id is a block ID, resolve the real av-id from its DOM.
+ * Returns the resolved avID (may be the same as input if it already is an avID).
  */
-async function getColumnInfo(avID: string): Promise<Map<string, { keyID: string; type: string; name: string }>> {
-    const result = await client.post('/api/av/renderAttributeView', { id: avID });
+async function resolveAvID(id: string): Promise<string> {
+    // Quick check: if getAttributeView returns real columns, it's already an avID
+    try {
+        const result = await client.post('/api/av/getAttributeView', { id });
+        if (result.code === 0 && result.data?.av?.keyValues && result.data.av.keyValues.length > 2) {
+            return id;
+        }
+    } catch { /* ignore */ }
+
+    // Try to parse av-id from the block's DOM
+    try {
+        const domResult = await client.post('/api/block/getBlockDOM', { id });
+        const dom = domResult.data?.dom || '';
+        const match = dom.match(/data-av-id="([^"]+)"/);
+        if (match && match[1] && match[1] !== id) {
+            return match[1];
+        }
+    } catch { /* ignore */ }
+
+    return id;
+}
+
+/**
+ * Fetch Attribute View data with blockID -> avID auto-resolution.
+ * Returns { data, avID } where avID is the resolved (real) av ID.
+ */
+async function fetchAvData(id: string, viewID?: string): Promise<{ data: any; avID: string }> {
+    const req: any = { id };
+    if (viewID) req.viewID = viewID;
+
+    const result = await client.post('/api/av/renderAttributeView', req);
     if (result.code !== 0) {
         throw new Error(result.msg || 'Failed to get attribute view');
     }
 
-    const data = result.data;
+    if (hasUsableAvData(result.data)) {
+        return { data: result.data, avID: id };
+    }
+
+    // Fallback: the id may be a block ID; resolve real av-id from DOM
+    const resolvedAvID = await resolveAvID(id);
+    if (resolvedAvID !== id) {
+        const retryReq: any = { id: resolvedAvID };
+        if (viewID) retryReq.viewID = viewID;
+        const retry = await client.post('/api/av/renderAttributeView', retryReq);
+        if (retry.code !== 0) {
+            throw new Error(retry.msg || 'Failed to get attribute view');
+        }
+        if (hasUsableAvData(retry.data)) {
+            return { data: retry.data, avID: resolvedAvID };
+        }
+        return { data: retry.data, avID: resolvedAvID };
+    }
+
+    return { data: result.data, avID: id };
+}
+
+/**
+ * Get column info from an Attribute View
+ * Returns a Map: columnName -> { keyID, type, name }
+ */
+async function getColumnInfo(avID: string): Promise<Map<string, { keyID: string; type: string; name: string }>> {
+    const { data } = await fetchAvData(avID);
+
     if (!hasUsableAvData(data)) {
         throw new Error(`Attribute View ${avID} 无法通过 API 获取结构（可能返回 av: null）。该数据库存在内部索引问题，建议通过 SQL 查询原始内容。`);
     }
@@ -546,34 +605,27 @@ const getAttributeViewHandler: CommandHandler<GetAttributeViewParams> = {
     params: getAttributeViewParams,
     handler: async (params) => {
         try {
-            const req: any = { id: params.avID };
-            if (params.viewID) req.viewID = params.viewID;
-            if (params.page) req.page = params.page;
-            if (params.pageSize) req.pageSize = params.pageSize;
+            const { data, avID } = await fetchAvData(params.avID, params.viewID);
 
-            const result = await client.post('/api/av/renderAttributeView', req);
-            if (result.code !== 0) {
-                return { content: [{ type: 'text', text: `Failed to get attribute view: ${result.msg}` }], isError: true };
-            }
-
-            const data = result.data;
-
-            // If API returns av: null or no usable structure, fallback to SQL
+            // If API still returns no usable structure after blockID->avID resolution, fallback to SQL
             if (!hasUsableAvData(data)) {
-                const sqlRow = await fetchAvContentViaSql(params.avID);
+                const sqlRow = await fetchAvContentViaSql(avID);
                 if (sqlRow) {
                     let output = `数据库 ID: ${params.avID}\n`;
+                    if (avID !== params.avID) {
+                        output += `解析后的 avID: ${avID}\n`;
+                    }
                     output += `块类型: ${sqlRow.type || 'N/A'}\n`;
-                    output += `[注意：renderAttributeView API 返回 av: null 或结构异常，以下通过 SQL 查询 blocks 表获取原始内容]\n\n`;
+                    output += `[注意：renderAttributeView API 返回空壳结构，以下通过 SQL 查询 blocks 表获取原始内容]\n\n`;
                     output += sqlRow.content || '(无内容)';
                     return {
                         content: [{ type: 'text', text: output }],
-                        _meta: { source: 'sql_fallback', avID: params.avID, apiResponse: data, sqlRow }
+                        _meta: { source: 'sql_fallback', avID, originalID: params.avID, apiResponse: data, sqlRow }
                     };
                 }
 
                 return {
-                    content: [{ type: 'text', text: `Attribute View ${params.avID} 无可用数据。API 返回异常（av: null）且 SQL 查询未找到对应记录。` }],
+                    content: [{ type: 'text', text: `Attribute View ${params.avID} 无可用数据。API 返回空壳且 SQL 查询未找到对应记录。` }],
                     isError: true
                 };
             }

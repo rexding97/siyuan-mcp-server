@@ -37,8 +37,26 @@ describe('hasUsableAvData', () => {
         expect(hasUsableAvData({ view: { columns: [], rows: [{ id: 'r1' }] } })).toBe(true);
     });
 
-    test('returns true when keyValues is non-empty', () => {
-        expect(hasUsableAvData({ keyValues: [{ key: { id: 'k1', name: 'Col1' } }] })).toBe(true);
+    test('returns true when view has real column definitions (>2 columns)', () => {
+        expect(hasUsableAvData({ view: { columns: [{ name: 'A' }, { name: 'B' }, { name: 'C' }], rows: [] } })).toBe(true);
+    });
+
+    test('returns false when view has only default 2 columns and no rows', () => {
+        expect(hasUsableAvData({ view: { columns: [{ name: '主键' }, { name: '单选' }], rows: [] } })).toBe(false);
+    });
+
+    test('returns false when keyValues has only one item (insufficient)', () => {
+        expect(hasUsableAvData({ keyValues: [{ key: { id: 'k1', name: 'Col1' } }] })).toBe(false);
+    });
+
+    test('returns true when keyValues has more than 2 items (real columns)', () => {
+        expect(hasUsableAvData({
+            keyValues: [
+                { key: { id: 'k1', name: 'Col1' } },
+                { key: { id: 'k2', name: 'Col2' } },
+                { key: { id: 'k3', name: 'Col3' } }
+            ]
+        })).toBe(true);
     });
 
     test('returns false when keyValues is empty array', () => {
