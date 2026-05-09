@@ -18,6 +18,39 @@ const columnTypeEnum = z.enum([
 // ============================================================================
 
 /**
+ * Check if renderAttributeView returned usable structured data
+ */
+function hasUsableAvData(data: any): boolean {
+    if (!data) return false;
+    // Normal case: av object with view or keyValues
+    if (data.av || data.view) return true;
+    if (data.keyValues && data.keyValues.length > 0) return true;
+    return false;
+}
+
+/**
+ * Fallback: query blocks table via SQL when API returns av: null
+ */
+async function fetchAvContentViaSql(avID: string): Promise<{ content: string; type: string; ial: string } | null> {
+    try {
+        const result = await client.post('/api/query/sql', {
+            stmt: `SELECT id, content, type, ial FROM blocks WHERE id = '${avID}'`
+        });
+        if (result.code !== 0 || !result.data || result.data.length === 0) {
+            return null;
+        }
+        const row = result.data[0];
+        return {
+            content: row.content || '',
+            type: row.type || '',
+            ial: row.ial || ''
+        };
+    } catch {
+        return null;
+    }
+}
+
+/**
  * Get column info from an Attribute View
  * Returns a Map: columnName -> { keyID, type, name }
  */
@@ -26,10 +59,24 @@ async function getColumnInfo(avID: string): Promise<Map<string, { keyID: string;
     if (result.code !== 0) {
         throw new Error(result.msg || 'Failed to get attribute view');
     }
-    const columns = (result.data as any)?.view?.columns || [];
+
+    const data = result.data;
+    if (!hasUsableAvData(data)) {
+        throw new Error(`Attribute View ${avID} 无法通过 API 获取结构（可能返回 av: null）。该数据库存在内部索引问题，建议通过 SQL 查询原始内容。`);
+    }
+
+    let columns = (data as any)?.view?.columns || [];
+
+    // Fallback: if columns are empty, try keyValues
+    if (columns.length === 0 && (data as any)?.keyValues) {
+        columns = buildColumnsFromKeyValues((data as any).keyValues);
+    }
+
     const map = new Map<string, { keyID: string; type: string; name: string }>();
     for (const col of columns) {
-        map.set(col.name, { keyID: col.id, type: col.type, name: col.name });
+        if (col.name && col.id) {
+            map.set(col.name, { keyID: col.id, type: col.type, name: col.name });
+        }
     }
     return map;
 }
@@ -148,6 +195,7 @@ function toFullAvValue(type: string, id: string, keyID: string, blockID: string,
 function formatCellValue(value: any): string {
     if (!value) return '';
     const v = value.value || value;
+    if (!v) return '';
     if (v.block) return v.block.content || '';
     if (v.text) return v.text.content || '';
     if (v.number) return String(v.number.content ?? '');
@@ -161,29 +209,69 @@ function formatCellValue(value: any): string {
 }
 
 /**
+ * Build rows from keyValues when view.rows is empty or unavailable.
+ * keyValues format: [{ key: {id, name, type}, values: [{id, keyID, blockID, type, text|number|...}] }]
+ */
+function buildRowsFromKeyValues(keyValues: any[]): any[] {
+    const rowMap = new Map<string, { id: string; cells: any[] }>();
+    for (const kv of keyValues) {
+        for (const value of kv.values || []) {
+            const blockID = value.blockID;
+            if (!blockID) continue;
+            if (!rowMap.has(blockID)) {
+                rowMap.set(blockID, { id: blockID, cells: [] });
+            }
+            rowMap.get(blockID)!.cells.push({ value });
+        }
+    }
+    return Array.from(rowMap.values());
+}
+
+/**
+ * Build columns from keyValues when view.columns is empty or unavailable.
+ */
+function buildColumnsFromKeyValues(keyValues: any[]): any[] {
+    return keyValues
+        .map((kv: any) => kv.key)
+        .filter((k: any) => k && k.id);
+}
+
+/**
  * Format Attribute View data for display
  */
 function formatAttributeView(data: any): string {
-    const av = data;
-    const view = av.view;
-    const columns = view.columns || [];
-    const rows = view.rows || [];
+    const av = data || {};
+    const view = av.view || {};
+    let columns = view.columns || [];
+    let rows = view.rows || [];
 
-    let output = `数据库: ${av.name}\n`;
-    output += `ID: ${av.id}\n`;
-    output += `视图: ${view.name}${view.type ? ` (${view.type})` : ''}\n`;
+    // Fallback: if rows/columns are empty but keyValues exist, build from keyValues
+    const keyValues = av.keyValues || [];
+    if (rows.length === 0 && keyValues.length > 0) {
+        rows = buildRowsFromKeyValues(keyValues);
+    }
+    if (columns.length === 0 && keyValues.length > 0) {
+        columns = buildColumnsFromKeyValues(keyValues);
+    }
+
+    let output = `数据库: ${av.name || 'N/A'}\n`;
+    output += `ID: ${av.id || 'N/A'}\n`;
+    output += `视图: ${view.name || 'N/A'}${view.type ? ` (${view.type})` : ''}\n`;
     output += `列 (${columns.length}):\n`;
     for (const col of columns) {
         const optStr = col.options ? ` [选项: ${col.options.map((o: any) => o.name).join(', ')}]` : '';
-        output += `  - ${col.name} (${col.type}${optStr}) [keyID: ${col.id}]\n`;
+        output += `  - ${col.name || 'N/A'} (${col.type || 'N/A'}${optStr}) [keyID: ${col.id || 'N/A'}]\n`;
     }
     output += `行 (${rows.length}):\n`;
     for (const row of rows) {
-        output += `  [${row.id}]\n`;
+        output += `  [${row.id || 'N/A'}]\n`;
         for (const cell of row.cells || []) {
-            const col = columns.find((c: any) => c.id === cell.value?.keyID);
+            // Support both cell.value.keyID and cell.keyID (direct value object)
+            const keyID = cell.value?.keyID || cell.keyID;
+            const col = columns.find((c: any) => c.id === keyID);
             if (col) {
-                output += `    ${col.name}: ${formatCellValue(cell)}\n`;
+                const cellVal = formatCellValue(cell);
+                output += `    ${col.name}: ${cellVal || '(空)'}\n`;
             }
         }
     }
@@ -451,10 +539,32 @@ const getAttributeViewHandler: CommandHandler<GetAttributeViewParams> = {
                 return { content: [{ type: 'text', text: `Failed to get attribute view: ${result.msg}` }], isError: true };
             }
 
-            const formatted = formatAttributeView(result.data);
+            const data = result.data;
+
+            // If API returns av: null or no usable structure, fallback to SQL
+            if (!hasUsableAvData(data)) {
+                const sqlRow = await fetchAvContentViaSql(params.avID);
+                if (sqlRow) {
+                    let output = `数据库 ID: ${params.avID}\n`;
+                    output += `块类型: ${sqlRow.type || 'N/A'}\n`;
+                    output += `[注意：renderAttributeView API 返回 av: null 或结构异常，以下通过 SQL 查询 blocks 表获取原始内容]\n\n`;
+                    output += sqlRow.content || '(无内容)';
+                    return {
+                        content: [{ type: 'text', text: output }],
+                        _meta: { source: 'sql_fallback', avID: params.avID, apiResponse: data, sqlRow }
+                    };
+                }
+
+                return {
+                    content: [{ type: 'text', text: `Attribute View ${params.avID} 无可用数据。API 返回异常（av: null）且 SQL 查询未找到对应记录。` }],
+                    isError: true
+                };
+            }
+
+            const formatted = formatAttributeView(data);
             return {
                 content: [{ type: 'text', text: formatted }],
-                _meta: result.data
+                _meta: data
             };
         } catch (error) {
             return {
