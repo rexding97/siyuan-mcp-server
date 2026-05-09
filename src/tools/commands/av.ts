@@ -18,13 +18,21 @@ const columnTypeEnum = z.enum([
 // ============================================================================
 
 /**
- * Check if renderAttributeView returned usable structured data
+ * Check if renderAttributeView returned usable structured data.
+ * SiYuan's renderAttributeView often returns a shell with only default columns
+ * (e.g. '主键', '单选') and zero rows. We treat that as unusable and fallback to SQL.
  */
 export function hasUsableAvData(data: any): boolean {
     if (!data) return false;
-    // Normal case: av object with view or keyValues
-    if (data.av || data.view) return true;
-    if (data.keyValues && data.keyValues.length > 0) return true;
+    const view = data.view || data.av?.view;
+    const rows = view?.rows;
+    const keyValues = data.keyValues || data.av?.keyValues;
+
+    // Has actual row data
+    if (Array.isArray(rows) && rows.length > 0) return true;
+    // Has keyValues
+    if (Array.isArray(keyValues) && keyValues.length > 0) return true;
+
     return false;
 }
 
@@ -240,17 +248,19 @@ export function buildColumnsFromKeyValues(keyValues: any[]): any[] {
 }
 
 /**
- * Format Attribute View data for display
+ * Format Attribute View data for display.
+ * Supports both nested (data.av) and flat (data directly) structures.
  * Exported for testing.
  */
 export function formatAttributeView(data: any): string {
     const av = data || {};
-    const view = av.view || {};
+    // Support both flat and nested structures
+    const view = av.view || av.av?.view || {};
     let columns = view.columns || [];
     let rows = view.rows || [];
 
     // Fallback: if rows/columns are empty but keyValues exist, build from keyValues
-    const keyValues = av.keyValues || [];
+    const keyValues = av.keyValues || av.av?.keyValues || [];
     if (rows.length === 0 && keyValues.length > 0) {
         rows = buildRowsFromKeyValues(keyValues);
     }
@@ -258,8 +268,11 @@ export function formatAttributeView(data: any): string {
         columns = buildColumnsFromKeyValues(keyValues);
     }
 
-    let output = `数据库: ${av.name || 'N/A'}\n`;
-    output += `ID: ${av.id || 'N/A'}\n`;
+    const name = av.name || av.av?.name || 'N/A';
+    const id = av.id || av.av?.id || 'N/A';
+
+    let output = `数据库: ${name}\n`;
+    output += `ID: ${id}\n`;
     output += `视图: ${view.name || 'N/A'}${view.type ? ` (${view.type})` : ''}\n`;
     output += `列 (${columns.length}):\n`;
     for (const col of columns) {

@@ -20,12 +20,21 @@ describe('hasUsableAvData', () => {
         expect(hasUsableAvData({ av: null })).toBe(false);
     });
 
-    test('returns true when av object exists', () => {
-        expect(hasUsableAvData({ av: { name: 'Test' } })).toBe(true);
+    test('returns false when av object exists but has no rows or keyValues', () => {
+        expect(hasUsableAvData({ av: { name: 'Test' } })).toBe(false);
     });
 
-    test('returns true when view exists', () => {
-        expect(hasUsableAvData({ view: { columns: [], rows: [] } })).toBe(true);
+    test('returns true when av object has rows', () => {
+        expect(hasUsableAvData({ av: { view: { rows: [{ id: 'r1' }] } } })).toBe(true);
+    });
+
+    test('returns false when view exists but rows are empty', () => {
+        // SiYuan often returns a shell with only default columns and zero rows
+        expect(hasUsableAvData({ view: { columns: ['主键', '单选'], rows: [] } })).toBe(false);
+    });
+
+    test('returns true when view has actual rows', () => {
+        expect(hasUsableAvData({ view: { columns: [], rows: [{ id: 'r1' }] } })).toBe(true);
     });
 
     test('returns true when keyValues is non-empty', () => {
@@ -178,6 +187,23 @@ describe('formatAttributeView', () => {
         expect(output).toContain('ID: N/A');
         expect(output).toContain('列 (0)');
         expect(output).toContain('行 (0)');
+    });
+
+    test('handles flat API response (no av wrapper)', () => {
+        const data = {
+            id: 'av1',
+            name: 'FlatDB',
+            view: {
+                name: '表格',
+                type: 'table',
+                columns: [{ id: 'k1', name: '名称', type: 'block' }],
+                rows: [{ id: 'row1', cells: [{ value: { keyID: 'k1', block: { content: 'Task A' } } }] }]
+            }
+        };
+        const output = formatAttributeView(data);
+        expect(output).toContain('数据库: FlatDB');
+        expect(output).toContain('ID: av1');
+        expect(output).toContain('Task A');
     });
 
     test('handles av: null response gracefully', () => {
