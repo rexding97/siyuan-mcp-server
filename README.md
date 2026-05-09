@@ -75,11 +75,12 @@ All commands are exposed both as standalone MCP tools and via the `executeComman
 | `query.*` | SQL queries and block lookup |
 | `attr.*` | Block attributes |
 | `assets.*` | Asset upload |
-| `export.*` | Export Markdown |
+| `export.*` | Export notebook / document |
 | `convert.*` | Pandoc conversion |
 | `system.*` | System info |
 | `notification.*` | Push messages |
 | `template.*` | Template rendering |
+| `sql.*` | SQL queries |
 | `network.*` | Forward proxy |
 
 ### Notebook Commands
@@ -159,12 +160,17 @@ All commands are exposed both as standalone MCP tools and via the `executeComman
 |---------|-------------|
 | `attr.setBlockAttrs` | Set block attributes |
 | `attr.getBlockAttrs` | Get block attributes |
-| `export.exportMdContent` | Export document as Markdown |
+| `export.exportNotebook` | Export notebook |
+| `export.exportDoc` | Export document |
 | `convert.pandoc` | Convert files via Pandoc |
+| `system.getBootProgress` | Get boot progress |
 | `system.getVersion` | Get SiYuan version |
 | `system.getCurrentTime` | Get server current time |
 | `notification.pushMsg` | Push a notification message |
+| `notification.pushErrMsg` | Push an error message |
 | `template.renderTemplate` | Render a template |
+| `template.renderSprig` | Render a Sprig template |
+| `sql.sql` | Execute SQL query |
 | `network.forwardProxy` | Forward HTTP request via proxy |
 
 ## MCP Tools
@@ -174,7 +180,7 @@ In addition to `executeCommand`, the following standalone MCP tools are register
 - `queryCommands` — List available commands
 - `executeCommand` — Execute any command by name
 - `help` — Get detailed help for a specific command
-- `av.createAttributeView` / `av.getAttributeView` / `av.addRow` / `av.updateRow` / `av.deleteRow` / `av.addColumn` / `av.removeColumn` / `av.updateCell`
+- `av_createAttributeView` / `av_getAttributeView` / `av_addRow` / `av_updateRow` / `av_deleteRow` / `av_addColumn` / `av_removeColumn` / `av_updateCell`
 
 ## Development
 
@@ -200,6 +206,8 @@ Significant modifications and enhancements have been made, including:
 - Fixed `file.getFile` and `file.putFile` commands
 - Independent MCP tool registration for better LLM discoverability
 - Added `filetree.listDocsByPath`, `block.prependBlock`, `block.appendBlock`, `block.getChildBlocks`, `block.foldBlock`, `block.unfoldBlock`
+- Added `export.exportNotebook`, `system.getBootProgress`, `notification.pushErrMsg`, `template.renderSprig`
+- AV blockID-to-avID auto-resolution and SQL fallback for robust database access
 
 ## License
 

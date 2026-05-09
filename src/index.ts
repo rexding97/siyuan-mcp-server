@@ -37,7 +37,7 @@ export class SiyuanMcpServer {
     }) {
         this.server = new McpServer({
             name: options?.name || "siyuan-mcp-server",
-            version: options?.version || "1.2.3",
+            version: options?.version || "2.0.0",
         });
 
         this.transport = new StdioServerTransport();
@@ -146,7 +146,7 @@ if (scriptPath === argvPath) {
 
     console.error('🚀 启动思源笔记 MCP 服务器...');
     console.error('📝 服务器名称: siyuan-mcp-server');
-    console.error('🔢 版本: 1.2.5');
+    console.error('🔢 版本: 2.0.0');
     console.error('🔗 传输协议: stdio');
     console.error('🛠️  服务器已就绪，可提供思源笔记相关工具');
 

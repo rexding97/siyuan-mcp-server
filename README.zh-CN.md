@@ -79,11 +79,12 @@ npx siyuan-mcp-server
 | `query.*` | SQL 查询和块查找 |
 | `attr.*` | 块属性 |
 | `assets.*` | 资源上传 |
-| `export.*` | 导出 Markdown |
+| `export.*` | 导出笔记本 / 文档 |
 | `convert.*` | Pandoc 转换 |
 | `system.*` | 系统信息 |
 | `notification.*` | 推送消息 |
 | `template.*` | 模板渲染 |
+| `sql.*` | SQL 查询 |
 | `network.*` | 转发代理 |
 
 ### 笔记本命令
@@ -163,12 +164,17 @@ npx siyuan-mcp-server
 |------|------|
 | `attr.setBlockAttrs` | 设置块属性 |
 | `attr.getBlockAttrs` | 获取块属性 |
-| `export.exportMdContent` | 导出文档为 Markdown |
+| `export.exportNotebook` | 导出笔记本 |
+| `export.exportDoc` | 导出文档 |
 | `convert.pandoc` | 通过 Pandoc 转换文件 |
+| `system.getBootProgress` | 获取启动进度 |
 | `system.getVersion` | 获取思源版本 |
 | `system.getCurrentTime` | 获取服务器当前时间 |
 | `notification.pushMsg` | 推送通知消息 |
+| `notification.pushErrMsg` | 推送错误消息 |
 | `template.renderTemplate` | 渲染模板 |
+| `template.renderSprig` | 渲染 Sprig 模板 |
+| `sql.sql` | 执行 SQL 查询 |
 | `network.forwardProxy` | 转发 HTTP 请求 |
 
 ## MCP 独立工具
@@ -178,7 +184,7 @@ npx siyuan-mcp-server
 - `queryCommands` — 列出可用命令
 - `executeCommand` — 通过名称执行任意命令
 - `help` — 获取指定命令的详细帮助
-- `av.createAttributeView` / `av.getAttributeView` / `av.addRow` / `av.updateRow` / `av.deleteRow` / `av.addColumn` / `av.removeColumn` / `av.updateCell`
+- `av_createAttributeView` / `av_getAttributeView` / `av_addRow` / `av_updateRow` / `av_deleteRow` / `av_addColumn` / `av_removeColumn` / `av_updateCell`
 
 ## 开发
 
@@ -204,6 +210,8 @@ npm run dev
 - 修复 `file.getFile` 和 `file.putFile` 命令
 - 独立的 MCP 工具注册，提升 LLM 可发现性
 - 新增 `filetree.listDocsByPath`、`block.prependBlock`、`block.appendBlock`、`block.getChildBlocks`、`block.foldBlock`、`block.unfoldBlock`
+- 新增 `export.exportNotebook`、`system.getBootProgress`、`notification.pushErrMsg`、`template.renderSprig`
+- AV blockID 自动解析为 avID 以及 SQL 降级查询，提升数据库访问稳定性
 
 ## 许可证
 
