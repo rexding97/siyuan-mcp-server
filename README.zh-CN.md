@@ -107,8 +107,11 @@ npx siyuan-mcp-server
 | `filetree.listDocsByPath` | 按路径列出笔记本中的文档 |
 | `filetree.createDocWithMd` | 使用 Markdown 内容创建文档 |
 | `filetree.renameDoc` | 重命名文档 |
+| `filetree.renameDocByID` | 通过 ID 重命名文档 |
 | `filetree.removeDoc` | 删除文档 |
+| `filetree.removeDocByID` | 通过 ID 删除文档 |
 | `filetree.moveDocs` | 移动文档 |
+| `filetree.moveDocsByID` | 通过 ID 移动文档 |
 | `filetree.getHPathByPath` | 通过路径获取可读路径 |
 | `filetree.getHPathByID` | 通过 ID 获取可读路径 |
 
@@ -210,8 +213,15 @@ npm run dev
 - 修复 `file.getFile` 和 `file.putFile` 命令
 - 独立的 MCP 工具注册，提升 LLM 可发现性
 - 新增 `filetree.listDocsByPath`、`block.prependBlock`、`block.appendBlock`、`block.getChildBlocks`、`block.foldBlock`、`block.unfoldBlock`
+- 新增 `filetree.removeDocByID`、`filetree.renameDocByID`、`filetree.moveDocsByID`
 - 新增 `export.exportNotebook`、`system.getBootProgress`、`notification.pushErrMsg`、`template.renderSprig`
 - AV blockID 自动解析为 avID 以及 SQL 降级查询，提升数据库访问稳定性
+
+### 已知的 API 行为
+
+- **`filetree.createDocWithMd`**: 当重复使用相同的 `path` 时，**不会**覆盖已有文档。
+- **`block.updateBlock`**: 只替换**单个块**的内容，而不是整个文档。如需重写整个文档，需先删除子块再追加新内容。
+- **`filetree.removeDoc`**: 可能返回成功但文档仍然可见（思源笔记内部索引/缓存原因）。当有文档 ID 时，建议使用更可靠的 `filetree.removeDocByID`。
 
 ## 许可证
 

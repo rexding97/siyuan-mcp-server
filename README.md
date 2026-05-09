@@ -103,8 +103,11 @@ All commands are exposed both as standalone MCP tools and via the `executeComman
 | `filetree.listDocsByPath` | List documents in a notebook by path |
 | `filetree.createDocWithMd` | Create a document with Markdown content |
 | `filetree.renameDoc` | Rename a document |
+| `filetree.renameDocByID` | Rename a document by ID |
 | `filetree.removeDoc` | Remove a document |
+| `filetree.removeDocByID` | Remove a document by ID |
 | `filetree.moveDocs` | Move documents |
+| `filetree.moveDocsByID` | Move documents by ID |
 | `filetree.getHPathByPath` | Get human-readable path by path |
 | `filetree.getHPathByID` | Get human-readable path by ID |
 
@@ -206,8 +209,15 @@ Significant modifications and enhancements have been made, including:
 - Fixed `file.getFile` and `file.putFile` commands
 - Independent MCP tool registration for better LLM discoverability
 - Added `filetree.listDocsByPath`, `block.prependBlock`, `block.appendBlock`, `block.getChildBlocks`, `block.foldBlock`, `block.unfoldBlock`
+- Added `filetree.removeDocByID`, `filetree.renameDocByID`, `filetree.moveDocsByID`
 - Added `export.exportNotebook`, `system.getBootProgress`, `notification.pushErrMsg`, `template.renderSprig`
 - AV blockID-to-avID auto-resolution and SQL fallback for robust database access
+
+### Known API Behaviors
+
+- **`filetree.createDocWithMd`**: Does **not** overwrite existing documents when the same `path` is used repeatedly.
+- **`block.updateBlock`**: Replaces the content of a **single block**, not the entire document. To rewrite a whole document, delete its child blocks and append new content.
+- **`filetree.removeDoc`**: May return success while the document remains visible due to SiYuan's internal index/cache. Use `filetree.removeDocByID` as a more reliable alternative when you have the document ID.
 
 ## License
 
