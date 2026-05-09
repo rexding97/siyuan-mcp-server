@@ -20,7 +20,7 @@ const columnTypeEnum = z.enum([
 /**
  * Check if renderAttributeView returned usable structured data
  */
-function hasUsableAvData(data: any): boolean {
+export function hasUsableAvData(data: any): boolean {
     if (!data) return false;
     // Normal case: av object with view or keyValues
     if (data.av || data.view) return true;
@@ -210,9 +210,11 @@ function formatCellValue(value: any): string {
 
 /**
  * Build rows from keyValues when view.rows is empty or unavailable.
+ * Exported for testing.
+ *
  * keyValues format: [{ key: {id, name, type}, values: [{id, keyID, blockID, type, text|number|...}] }]
  */
-function buildRowsFromKeyValues(keyValues: any[]): any[] {
+export function buildRowsFromKeyValues(keyValues: any[]): any[] {
     const rowMap = new Map<string, { id: string; cells: any[] }>();
     for (const kv of keyValues) {
         for (const value of kv.values || []) {
@@ -229,8 +231,9 @@ function buildRowsFromKeyValues(keyValues: any[]): any[] {
 
 /**
  * Build columns from keyValues when view.columns is empty or unavailable.
+ * Exported for testing.
  */
-function buildColumnsFromKeyValues(keyValues: any[]): any[] {
+export function buildColumnsFromKeyValues(keyValues: any[]): any[] {
     return keyValues
         .map((kv: any) => kv.key)
         .filter((k: any) => k && k.id);
@@ -238,8 +241,9 @@ function buildColumnsFromKeyValues(keyValues: any[]): any[] {
 
 /**
  * Format Attribute View data for display
+ * Exported for testing.
  */
-function formatAttributeView(data: any): string {
+export function formatAttributeView(data: any): string {
     const av = data || {};
     const view = av.view || {};
     let columns = view.columns || [];
